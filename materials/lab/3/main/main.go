@@ -14,8 +14,8 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		log.Fatalln("Usage: main <searchterm>")
+	if len(os.Args) < 2 {
+		log.Fatalln("Usage: main <ports|search>")
 	}
 	apiKey := os.Getenv("SHODAN_API_KEY")
 	s := shodan.New(apiKey)
@@ -28,7 +28,30 @@ func main() {
 		info.QueryCredits,
 		info.ScanCredits)
 
-	hostSearch, err := s.HostSearch(os.Args[1])
+	if os.Args[1] == "ports" {
+		portList(s)
+	} else{
+		search(s)
+	}
+}
+
+// I would pipe this out to some junk file, it's a long list
+func portList(client *shodan.Client){
+	ports, err := client.ListPorts()
+	if err != nil {
+		log.Panicln(err)
+	}
+	fmt.Println("Ports them crawlerz be looking for:")
+	for _, port := range ports {
+		fmt.Print(string(port))
+	}
+}
+
+func search(client *shodan.Client) {
+	if len(os.Args) != 2 {
+		log.Fatalln("Usage: main search <searchterm>")
+	}
+	hostSearch, err := client.HostSearch(os.Args[1])
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -49,6 +72,4 @@ func main() {
 	for _, host := range hostSearch.Matches {
 		fmt.Printf("%s, %d\n", host.IPString, host.Port)
 	}
-
-
 }
