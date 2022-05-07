@@ -8,14 +8,21 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
+	"time"
 )
 
 //==========================================================================\\
 
 var shalookup map[string]string
 var md5lookup map[string]string
+var mutext = &sync.Mutex{}
+var mutextword = &sync.Mutex{}
 
 func GuessSingle(sourceHash string, filename string) {
+	begin := time.Now()
+
+	n := len(sourceHash)
 
 	f, err := os.Open(filename)
 	if err != nil {
@@ -28,23 +35,28 @@ func GuessSingle(sourceHash string, filename string) {
 	for scanner.Scan() {
 		password := scanner.Text()
 
-		// TODO - From the length of the hash you should know which one of these to check ...
 		// add a check and logicial structure
-
-		hash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
-		if hash == sourceHash {
-			fmt.Printf("[+] Password found (MD5): %s\n", password)
-		}
-
-		hash = fmt.Sprintf("%x", sha256.Sum256([]byte(password)))
-		if hash == sourceHash {
-			fmt.Printf("[+] Password found (SHA-256): %s\n", password)
+		if n == 32 {
+			hash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+			if hash == sourceHash {
+				fmt.Printf("[+] Password found (MD5): %s\n", password)
+			}
+		} else if n == 64 {
+			hash := fmt.Sprintf("%x", sha256.Sum256([]byte(password)))
+			if hash == sourceHash {
+				fmt.Printf("[+] Password found (SHA-256): %s\n", password)
+			}
+		} else {
+			fmt.Println("error: unknown hash length")
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
 		log.Fatalln(err)
 	}
+	done := time.Now()
+	elapsed := done.Sub(begin)
+	fmt.Printf("Duration for %s: %v\n", sourceHash, elapsed.Milliseconds())
 }
 
 func GenHashMaps(filename string) {
@@ -59,6 +71,25 @@ func GenHashMaps(filename string) {
 	//Test and record the time it takes to scan to generate these Maps
 	// 1. With and without using go subroutines
 	// 2. Compute the time per password (hint the number of passwords for each file is listed on the site...)
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer file.Close()
+
+	scan := bufio.NewScanner(file)
+
+	shalookup = make(map[string]string)
+	md5lookup = make(map[string]string)
+
+	for scan.Scan() {
+		pass := scan.Text()
+
+		go addto(pass)
+	}
+	if err := scan.Err(); err != nil {
+		log.Fatalln(err)
+	}
 }
 
 func GetSHA(hash string) (string, error) {
@@ -73,7 +104,23 @@ func GetSHA(hash string) (string, error) {
 	}
 }
 
-//TODO
 func GetMD5(hash string) (string, error) {
-	return "", errors.New("not implemented")
+	pass, itBeOkey := md5lookup[hash]
+
+	if itBeOkey {
+		return pass, nil
+	} else {
+		return "", errors.New("password does not exist")
+	}
+}
+
+func addto(pass string) {
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(pass)))
+	mutext.Lock()
+	shalookup[hash] = pass
+	mutext.Unlock()
+	hash = fmt.Sprintf("%x", md5.Sum([]byte(pass)))
+	mutextword.Lock()
+	md5lookup[hash] = pass
+	mutextword.Unlock()
 }

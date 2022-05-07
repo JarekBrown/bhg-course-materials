@@ -14,3 +14,12 @@ func TestGuessSingle(t *testing.T) {
 	}
 
 }
+
+func TestGuessSingleAgain(t *testing.T) {
+	got := GuessSingle("b3995d3c36af97aacd90b10cfaa7b4ff07cb44b89a594954f5228cf271211b81") // Currently function returns only number of open ports
+	want := "gopherman"
+	if got != want {
+		t.Errorf("got %d, wanted %d", got, want)
+	}
+
+}
